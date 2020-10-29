@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+
+<head>
+  <meta charset="utf-8">
+  <title>Real Time Chat</title>
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    body {
+      margin-top: 30px;
+    }
+
+    #messageArea {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div id="userFormArea" class="row">
+      <div class="col-md-12">
+        <form id="userForm">
+          <div class="form-group">
+            <label>Enter Username</label>
+            <input class="form-control" id="username"></input>
+            <br />
+            <input type="submit" class="btn btn-primary" value="Login" />
+          </div>
+        </form>
+      </div>
+    </div>
+    <div id="messageArea" class="row">
+      <div class="col-md-4">
+        <div class="well">
+          <h3>Online Users</h3>
+          <ul class="list-group" id="users"></ul>
+        </div>
+      </div>
+      <div class="col-md-8">
+        <div class="chat" id="chat"></div>
+        <form id="messageForm">
+          <div class="form-group">
+            <label>Enter Message</label>
+            <textarea class="form-control" id="message"></textarea>
+            <br />
+            <input type="submit" class="btn btn-primary" value="Send Message" />
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var typing = false;
+    var timeout = undefined;
+    var user;
+    $(function() {
+      var socket = io.connect();
+      var $messageForm = $('#messageForm');
+      var $message = $('#message');
+      var $chat = $('#chat');
+      var $messageArea = $('#messageArea');
+      var $userFormArea = $('#userFormArea');
+      var $userForm = $('#userForm');
+      var $users = $('#users');
+      var $username = $('#username');
+
+      $messageForm.submit(function(e) {
+        e.preventDefault();
+        socket.emit('send message', $message.val());
+        $message.val('');
+      });
+
+      //user is typing!!
+      $('#message').keypress((e) => {
+        if (e.which != 13) {
+          typing = true
+          socket.emit('typing', {
+            user: user,
+            typing: true
+          })
+          clearTimeout(timeout)
+          timeout = setTimeout(typingTimeout, 3000)
+        } else {
+          clearTimeout(timeout)
+          typingTimeout()
+          //sendMessage() function will be called once the user hits enter
+          sendMessage()
+        }
+      })
+
+      socket.on('display', (data) => {
+        if (data.typing == true)
+          $('.typing').text(`${data.user} is typing...`)
+        else
+          $('.typing').text("")
+      })
+      //end of user is typing!!
+
+      socket.on('new message', function(data) {
+        $chat.append('<div class="well"><strong>' + data.user + '</strong>: ' + data.msg + '</div>')
+      });
+
+      $userForm.submit(function(e) {
+        e.preventDefault();
+        socket.emit('new user', $username.val(), function(data) {
+          if (data) {
+            $userFormArea.hide();
+            $messageArea.show();
+          }
+        });
+        $username.val('');
+      });
+
+      socket.on('get users', function(data) {
+        var html = '';
+        for (var i = 0; i < data.length; i++) {
+          html += '<li class="list-group-item">' + data[i] + '</li>'
+        }
+        $users.html(html);
+      });
+    });
+  </script>
+</body>
+
+</html>
